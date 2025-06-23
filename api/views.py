@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework import status
 # Create your views here.
 
+from .serializers import RouteapiSerializer
 from django.conf import settings
 
 class ZenApi(APIView):
@@ -18,10 +19,15 @@ class ZenApi(APIView):
         return Response(data, status=status.HTTP_200_OK)
     
     def post(self,request):
-        data = request.data
         
-        source = data.get('source')
-        destination = data.get('destination')
+        serializer = RouteapiSerializer(data = request.data)        
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors,status=status.HTTP_404_NOT_FOUND)
+        
+        
+        source = serializer.validated_data['source']
+        destination = serializer.validated_data['destination']
         
         url = f"https://maps.googleapis.com/maps/api/directions/json?origin={source}&destination={destination}&key={settings.GOOGLE_MAPS_API_KEY}&alternatives=true"
         
@@ -29,6 +35,10 @@ class ZenApi(APIView):
         response = response.json()
         routes = response["routes"]
         print(len(routes))
+        
+        if response['status']!="OK":
+            return Response({"error": "No routes found for the given locations."},status=status.HTTP_400_BAD_REQUEST)
+        
         top_3_routes = sorted(routes, key=lambda x: x["legs"][0]["duration"]["value"])[:3]
         
         print([r["legs"][0]["duration"]["text"] for r in top_3_routes])
